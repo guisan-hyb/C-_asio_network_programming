@@ -1,0 +1,43 @@
+# 编译产物
+*.exe
+*.obj
+*.o
+*.out
+
+# IDE 文件
+.vs/
+*.user
+*.suo
+x64/
+Debug/
+Release/
+cmake-build-*/
+
+# ========================
+# Visual Studio 产生的编译产物和缓存 
+# ========================
+.vs/
+x64/
+Debug/
+Release/
+*.obj
+*.exe
+*.pdb
+*.ilk
+*.lib
+*.log
+*.idb
+*.ipch
+*.tlog
+*.lastbuildstate
+*.unsuccessfulbuild
+*.cache
+
+# ========================
+# 用户特定的配置文件 
+# ========================
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
