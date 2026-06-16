@@ -3,6 +3,8 @@
 #include <boost/asio.hpp>
 #include <iostream>
 
+//socket的监听和连接
+
 //一.端点的创建
 
 //如果我们是客户端，我们可以通过对端的ip和端口构造一个endpoint，用这个endpoint和其通信
@@ -189,6 +191,261 @@ int accept_new_connection() //重点
 	}
 
 	return 0;
+}
+
+
+
+
+
+
+//buffer结构
+
+void use_const_buffer()
+{
+	std::string buf = "hello world";
+	boost::asio::const_buffer asio_buf(buf.data(), buf.length());
+	std::vector<boost::asio::const_buffer> buffers_sequence;
+	buffers_sequence.emplace_back(asio_buf);
+
+	//伪代码：
+	//asio.send(buffers_sequence);
+}
+
+//上面这个写法太复杂，可以直接用buffer函数转化为send需要的参数类型
+//boost::asio::buffer() 是一个重载函数，它可以根据你传入的参数自动推导并生成合适的缓冲区对象
+void use_buffer_str()
+{
+	boost::asio::const_buffer asio_buf = boost::asio::buffer("hello world");
+}
+
+//如果要传的是数组呢
+void use_buffer_array()
+{
+	const size_t BUF_SIZE_BYTES = 20;
+	std::unique_ptr<char[]> buf(new char[BUF_SIZE_BYTES]);
+	auto input_buf = boost::asio::buffer(static_cast<void*>(buf.get()), BUF_SIZE_BYTES);
+}
+
+//对于流式操作，我们可以用streambuf，将输入输出流和streambuf绑定，可以实现流式输入和输出。
+void use_stream_buffer()
+{
+	boost::asio::streambuf buf;
+	std::ostream output(&buf);
+	output << "Message1\nMessage2";
+	std::istream input(&buf);
+
+	std::string message1;
+	std::getline(input, message1);
+}
+
+
+
+
+
+
+
+//同步读写
+
+//同步写 write_some
+//boost::asio提供了几种同步写的api，write_some可以每次向指定的空间写入固定的字节数，如果写缓冲区满了，就只写一部分，返回写入的字节数
+void write_to_socket(boost::asio::ip::tcp::socket& sock) {
+	std::string buf = "hello world";
+	std::size_t total_bytes_written = 0;//表示我们总共写了多少数据
+
+	//循环发送（重要）
+	while (total_bytes_written != buf.length()) {
+		//write_some 返回每次写入的字节数
+		total_bytes_written += sock.write_some(boost::asio::buffer(buf.data() + total_bytes_written, buf.length() - total_bytes_written));
+		//参数1：指针偏移    参数2：剩余长度
+	}
+}
+
+//同步写 write_some
+//客户端连接端口并发送
+int send_data_by_write_some()
+{
+	std::string raw_ip_address = "192.168.3.11";
+	unsigned short port_num = 3333;
+	try {
+		boost::asio::ip::tcp::endpoint ep(boost::asio::ip::make_address(raw_ip_address), port_num);
+		boost::asio::io_context ioc;
+		boost::asio::ip::tcp::socket sock(ioc, ep.protocol());
+		sock.connect(ep);
+		write_to_socket(sock);//调用上面那个我自己写的函数
+	}
+	catch (boost::system::system_error& e) {
+		std::cout << "Error occured! Error code = " << e.code().value()
+			<< ". Message: " << e.what();
+		return e.code().value();
+	}
+
+	return 0;
+}
+
+//同步写 send
+//客户端连接端口并发送
+//write_some使用起来比较麻烦，需要多次调用，asio提供了send函数。
+//send函数会一次性将buffer中的内容发送给对端，如果有部分字节因为发送缓冲区满无法发送，则阻塞等待，直到发送缓冲区可用，则继续发送完成。
+int send_data_by_send()
+{
+	std::string raw_ip_address = "192.168.3.11";
+	unsigned short port_num = 3333;
+	try {
+		boost::asio::ip::tcp::endpoint ep(boost::asio::ip::make_address(raw_ip_address), port_num);
+		boost::asio::io_context ioc;
+		boost::asio::ip::tcp::socket sock(ioc, ep.protocol());
+		sock.connect(ep);
+
+		std::string buf = "hello world";
+		int send_length = sock.send(boost::asio::buffer(buf.data(), buf.length()));
+		if (send_length <= 0) {
+			std::cout << "send failed" << std::endl;
+			return 0;
+		}
+	}
+	catch (boost::system::system_error& e) {
+		std::cout << "Error occured! Error code = " << e.code().value()
+			<< ". Message: " << e.what();
+		return e.code().value();
+	}
+
+	return 0;
+}
+
+//同步写 write
+//类似send方法，asio还提供了一个write函数，可以一次性将所有数据发送给对端，
+//如果发送缓冲区满了则阻塞，直到发送缓冲区可用，将数据发送完成。
+int send_data_by_write()
+{
+	std::string raw_ip_address = "192.168.3.11";
+	unsigned short port_num = 3333;
+	try {
+		boost::asio::ip::tcp::endpoint ep(boost::asio::ip::make_address(raw_ip_address), port_num);
+		boost::asio::io_context ioc;
+		boost::asio::ip::tcp::socket sock(ioc, ep.protocol());
+		sock.connect(ep);
+
+		std::string buf = "hello world";
+		int send_length = boost::asio::write(sock, boost::asio::buffer(buf.data(), buf.length()));
+		if (send_length <= 0) {
+			std::cout << "send failed" << std::endl;
+			return 0;
+		}
+	}
+	catch (boost::system::system_error& e) {
+		std::cout << "Error occured! Error code = " << e.code().value()
+			<< ". Message: " << e.what();
+		return e.code().value();
+	}
+
+	return 0;
+}
+
+
+//同步读 read_some
+//同步读和同步写类似，提供了读取指定字节数的接口read_some
+std::string read_from_socket(boost::asio::ip::tcp::socket& sock)
+{
+	const unsigned char MESSAGE_SIZE = 7;
+	char buf[MESSAGE_SIZE];
+	std::size_t total_bytes_read = 0;
+	while (total_bytes_read != MESSAGE_SIZE) {
+		total_bytes_read += sock.read_some(boost::asio::buffer(buf + total_bytes_read, MESSAGE_SIZE - total_bytes_read));
+	}
+
+	return std::string(buf, total_bytes_read);
+}
+
+//作为socket怎么把读的过程串联起来呢
+int read_data_by_read_some()
+{
+	std::string raw_ip_address = "127.0.0.1";
+	unsigned short port_num = 3333;
+	try {
+		boost::asio::ip::tcp::endpoint ep(boost::asio::ip::make_address(raw_ip_address), port_num);
+		boost::asio::io_context ioc;
+		boost::asio::ip::tcp::socket sock(ioc, ep.protocol());
+		sock.connect(ep);
+		read_from_socket(sock);//调用上面写的函数
+	}
+	catch (boost::system::system_error& e) {
+		std::cout << "Error occured! Error code = " << e.code().value()
+			<< ". Message: " << e.what();
+		return e.code().value();
+	}
+
+	return 0;
+}
+
+//同步读receive
+//可以一次性同步接收对方发送的数据
+int read_data_by_receive()
+{
+	std::string raw_ip_address = "192.168.1.11";
+	unsigned short port_num = 3333;
+	try {
+		boost::asio::ip::tcp::endpoint ep(boost::asio::ip::make_address(raw_ip_address), port_num);
+		boost::asio::io_context ioc;
+		boost::asio::ip::tcp::socket sock(ioc, ep.protocol());
+		sock.connect(ep);
+
+		const unsigned char BUFF_SIZE = 7;
+		char buffer_receive[BUFF_SIZE];
+		int receive_length = sock.receive(boost::asio::buffer(buffer_receive, BUFF_SIZE));
+		if (receive_length <= 0) {
+			std::cout << "receive failed" << std::endl;
+			return 0;
+		}
+	}
+	catch (boost::system::system_error& e) {
+		std::cout << "Error occured! Error code = " << e.code().value()
+			<< ". Message: " << e.what();
+		return e.code().value();
+	}
+	
+	return 0;
+}
+
+//同步读read
+//可以一次性同步读取对方发送的数据
+int read_data_by_read()
+{
+	std::string raw_ip_address = "192.168.1.11";
+	unsigned short port_num = 3333;
+	try {
+		boost::asio::ip::tcp::endpoint ep(boost::asio::ip::make_address(raw_ip_address), port_num);
+		boost::asio::io_context ioc;
+		boost::asio::ip::tcp::socket sock(ioc, ep.protocol());
+		sock.connect(ep);
+
+		const unsigned char BUFF_SIZE = 7;
+		char buffer_receive[BUFF_SIZE];
+		int receive_length = boost::asio::read(sock, boost::asio::buffer(buffer_receive, BUFF_SIZE));
+		if (receive_length <= 0) {
+			std::cout << "receive failed" << std::endl;
+			return 0;
+		}
+	}
+	catch (boost::system::system_error& e) {
+		std::cout << "Error occured! Error code = " << e.code().value()
+			<< ". Message: " << e.what();
+		return e.code().value();
+	}
+
+	return 0;
+}
+
+//读取直到指定字符
+//我们可以一直读取，直到读取指定字符结束
+std::string read_data_by_until(boost::asio::ip::tcp::socket& sock)
+{
+	boost::asio::streambuf buf;
+	boost::asio::read_until(sock, buf, '\n');//读到换行符结束
+	std::string message;
+	std::istream input_stream(&buf);
+	std::getline(input_stream, message);
+
+	return message;
 }
 
 
