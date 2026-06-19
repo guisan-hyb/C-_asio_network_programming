@@ -25,7 +25,7 @@ int main() {
 		boost::asio::write(sock, boost::asio::buffer(request, request_lenth));
 
 		char reply[MAX_LENGTH];
-		size_t reply_length = boost::asio::read(sock, boost::asio::buffer(reply, MAX_LENGTH));
+		size_t reply_length = boost::asio::read(sock, boost::asio::buffer(reply, request_lenth));
 		std::cout << "Reply is: ";
 		std::cout.write(reply, reply_length);
 		std::cout << '\n';
