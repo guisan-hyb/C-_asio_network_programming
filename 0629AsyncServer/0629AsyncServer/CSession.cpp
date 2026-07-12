@@ -149,6 +149,7 @@ void CSession::handle_read(const boost::system::error_code& error, std::size_t b
 					_socket.async_read_some(boost::asio::buffer(_data, MAX_LENGTH),
 						std::bind(&CSession::handle_read, this, std::placeholders::_1, std::placeholders::_2,
 							SharedSelf()));
+					return;
 				}
 
 				continue;
