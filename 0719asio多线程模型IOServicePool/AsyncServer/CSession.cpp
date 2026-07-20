@@ -167,7 +167,7 @@ void CSession::HandleReadMsg(const boost::system::error_code& error, std::size_t
 		}
 	}
 	catch (std::exception& e) {
-		std::cerr << "Exception code: " << error.message() << std::endl;
+		std::cerr << "Exception code: " << error.what() << std::endl;
 	}
 }
 

@@ -71,7 +71,7 @@ int main() {
 					std::size_t msg_length = boost::asio::read(sock, boost::asio::buffer(reply_data, msglen));
 					json reader;
 					reader = json::parse(std::string(reply_data, msg_length));
-					std::cout << "msg id is: " << root["id"].get<short>() << " msg is: " << root["data"] << std::endl;
+					std::cout << "msg id is: " << reader["id"].get<short>() << " msg is: " << reader["data"] << std::endl;
 				}
 			}
 			catch (std::exception& e) {
